@@ -1,0 +1,26 @@
+# 交流意图单标签初稿；调整标签含义或集合时同步修改 version。
+version: intent-draft-v1
+labels:
+  - agree
+  - disagree
+  - tease
+  - comfort
+  - request
+  - greet
+  - thank
+  - apologize
+  - acknowledge
+  - other
+  - uncertain
+descriptions:
+  agree: "赞同 / 支持：表达认可、支持或接受观点。"
+  disagree: "反对 / 拒绝：否定观点、拒绝请求或表达异议。"
+  tease: "调侃 / 吐槽：开玩笑、讽刺或戏谑式评价。"
+  comfort: "安慰 / 鼓励：表达关心、安抚或鼓励。"
+  request: "请求 / 询问：寻求行动、帮助、信息或解释。"
+  greet: "问候 / 开场：打招呼、告别或发起互动。"
+  thank: "感谢：对帮助或好意表示感谢。"
+  apologize: "道歉：表达歉意或承认过失。"
+  acknowledge: "回应 / 确认收到：表示在场、收到或已知晓，不必然赞同。"
+  other: "其他：意图可判断，但不属于上述类别；请在备注说明。"
+  uncertain: "无法判断：缺少语境、多种解读或无法确定主要意图；请在备注说明。"

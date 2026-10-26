@@ -1,0 +1,15 @@
+# 架构与预训练权重尚未选型；此文件暂用于记录实验设计。
+seed: 42
+split:
+  train: 0.8
+  val: 0.1
+  test: 0.1
+image:
+  architecture: null
+text:
+  architecture: null
+multimodal:
+  architecture: null
+context:
+  max_messages: 12
+  max_chars_per_message: 500

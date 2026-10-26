@@ -1,0 +1,46 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MemeSense · 交流意图标注</title><style>
+*{box-sizing:border-box}body{margin:0;background:#f2f5f7;color:#19313c;font-family:system-ui,"Microsoft YaHei",sans-serif}main{max-width:1400px;margin:auto;padding:30px 22px}h1{margin:10px 0}p,li{line-height:1.7}.intro{color:#526772}header>small{color:#246c79;letter-spacing:2px}details,.toolbar{background:white;border:1px solid #dce5e9;border-radius:12px;padding:16px;margin:20px 0}.toolbar{display:flex;gap:16px;flex-wrap:wrap;align-items:center}button,input,select,textarea{font:inherit}button{cursor:pointer;padding:10px 16px;background:#225f6c;color:white;border:0;border-radius:6px}input,select,textarea{padding:8px;border:1px solid #a4b7bf;border-radius:5px;max-width:100%}.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px}.card{border:1px solid #dce5e9;border-radius:12px;background:white;overflow:hidden}.preview{height:230px;background:#e7edf0;display:flex;align-items:center;justify-content:center;padding:12px}.preview img{max-height:100%;max-width:100%;object-fit:contain}.body{padding:18px}h2{font-size:19px;margin:0}h2 small{font-size:13px;font-weight:400;color:#60717b}label{display:block}select,textarea{display:block;width:100%;margin:7px 0 14px}.path{overflow-wrap:anywhere;color:#61717b;font-size:13px}.status{font-size:13px;color:#266e5d}[hidden]{display:none!important}:focus-visible{outline:3px solid #258ba1;outline-offset:2px}@media(max-width:480px){main{padding:20px 12px}.cards{grid-template-columns:1fr}}
+</style></head><body><main>
+<header><small>MEMESENSE / INTENT ANNOTATION</small><h1>交流意图人工标注</h1>
+<p class="intro">标签体系：{{VERSION}} · 单标签初稿，可调整。请选择表情包在交流中主要想实现的目的，而不是仅凭情绪或表情判断。相同模板也可能表达不同意图，不自动共享标签。</p>
+<p class="intro">无对话语境时仅记录可支持的判断；不确定请选择“无法判断”，并说明原因。“其他”表示意图明确但不在分类中。选了标签表示已填写，不代表标签质量已审核。</p>
+<p class="intro">本页不修改原索引或原图。修改仅存于页面，刷新或关闭前请下载 CSV 并确认保存；导出包含全部样本，未标注样本也保留。</p></header>
+<details><summary>标签定义与标注说明</summary><ul>{{GUIDE}}</ul></details>
+<div class="toolbar"><label>搜索 <input id="search" type="search" placeholder="sample_id、模板或路径"></label><label><input id="pending" type="checkbox"> 仅未标注</label><span id="progress" role="status"></span><button id="export">导出标注 CSV</button><span id="save-status" role="status">尚无修改</span></div>
+<noscript>请启用 JavaScript 以编辑和导出标注。</noscript><div class="cards">{{CARDS}}</div><p id="empty" hidden>没有匹配的样本。</p>
+</main><script id="annotation-data" type="application/json">{{DATA}}</script><script>
+const payload=JSON.parse(document.getElementById('annotation-data').textContent);
+const rows=payload.rows;
+const cards=[...document.querySelectorAll('.card')];
+let dirty=false;
+function refresh(){
+ const query=document.getElementById('search').value.trim().toLowerCase();
+ const pending=document.getElementById('pending').checked;
+ let visible=0;
+ cards.forEach(card=>{
+  const row=rows[Number(card.dataset.index)];
+  card.querySelector('.status').textContent=row.intent_label?'已填写：'+row.intent_label:'未标注';
+  card.hidden=!( [row.sample_id,row.template_id,row.image_path].join(' ').toLowerCase().includes(query) && (!pending||!row.intent_label));
+  if(!card.hidden)visible++;
+ });
+ document.getElementById('progress').textContent=`已填写 ${rows.filter(r=>r.intent_label).length} / ${rows.length} · 显示 ${visible}`;
+ document.getElementById('empty').hidden=visible>0;
+}
+cards.forEach(card=>{
+ const row=rows[Number(card.dataset.index)];
+ function changed(){dirty=true;document.getElementById('save-status').textContent='有未导出的修改';refresh();}
+ card.querySelector('.intent').addEventListener('change',event=>{row.intent_label=event.target.value;row.annotation_status=row.intent_label?'annotated':'pending';changed();});
+ card.querySelector('.notes').addEventListener('input',event=>{row.annotation_notes=event.target.value;changed();});
+});
+document.getElementById('search').addEventListener('input',refresh);
+document.getElementById('pending').addEventListener('change',refresh);
+window.addEventListener('beforeunload',event=>{if(dirty){event.preventDefault();event.returnValue='';}});
+document.getElementById('export').addEventListener('click',()=>{
+ const quote=value=>'"'+String(value??'').replaceAll('"','""')+'"';
+ const text='\uFEFF'+[payload.fields.map(quote).join(','),...rows.map(row=>payload.fields.map(field=>quote(row[field])).join(','))].join('\r\n')+'\r\n';
+ const url=URL.createObjectURL(new Blob([text],{type:'text/csv;charset=utf-8'}));
+ const link=document.createElement('a');link.href=url;link.download='meme_annotations_'+new Date().toISOString().replace(/[:.]/g,'-')+'.csv';document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),10000);
+ dirty=false;document.getElementById('save-status').textContent='已发起下载，请确认文件已保存';
+});refresh();
+</script></body></html>

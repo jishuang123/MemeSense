@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MemeSense · 模板人工复核</title>
+<style>
+:root { color-scheme: light; font-family: system-ui, "Microsoft YaHei", sans-serif; color: #182c3b; background: #f2f5f7; }
+* { box-sizing: border-box; } body { margin: 0; } main { max-width: 1440px; margin: auto; padding: 32px 24px 64px; }
+h1 { margin: 8px 0 14px; font-size: 30px; } h2 { margin: 0; font-size: 20px; overflow-wrap: anywhere; }
+.eyebrow { color: #356d79; font-weight: 700; letter-spacing: .12em; font-size: 13px; }
+.intro { line-height: 1.8; max-width: 1000px; color: #51616b; } .stats { font-size: 16px; font-weight: 600; }
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 18px; padding: 18px; background: white; border: 1px solid #dce4e8; border-radius: 12px; margin: 24px 0; }
+input, select, button { font: inherit; } input[type=search] { width: min(320px, 100%); } input[type=number] { width: 68px; }
+input[type=search], input[type=number], select { border: 1px solid #a5b6c0; padding: 8px; border-radius: 6px; background: white; color: inherit; }
+.group { margin: 24px 0 36px; } .group-heading { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; align-items: center; margin: 0 0 16px; }
+small { font-size: 14px; font-weight: 400; color: #60717c; margin-left: 10px; } .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+.card { background: white; border: 1px solid #dce4e8; border-radius: 12px; overflow: hidden; } .card.flagged { border: 2px solid #b65422; }
+.preview, .missing { width: 100%; height: 220px; border: 0; background: #e8edf0; display: flex; align-items: center; justify-content: center; padding: 12px; }
+.preview { cursor: zoom-in; } .preview img { max-width: 100%; max-height: 100%; object-fit: contain; } .missing { color: #7b4a36; font-size: 14px; text-align: center; }
+.card-body { padding: 16px; } .distance { color: #256354; font-size: 14px; } .flagged .distance { color: #a43e12; font-weight: 700; }
+.review-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+.review-actions button, #export { padding: 9px 14px; border: 1px solid #809da6; border-radius: 6px; background: white; color: #214d58; cursor: pointer; }
+#export { background: #215b68; color: white; } .edit-label { display: block; font-size: 13px; margin-top: 14px; }
+.template-edit { display: block; width: 100%; margin-top: 6px; padding: 8px; border: 1px solid #9baeb8; border-radius: 5px; }
+.sample-status, .group-status { font-size: 13px; color: #51616b; }
+.path { font-size: 13px; color: #64727b; overflow-wrap: anywhere; } code { font-size: 12px; overflow-wrap: anywhere; }
+.empty { text-align: center; padding: 64px 24px; background: white; border-radius: 12px; color: #64727b; line-height: 1.8; }
+dialog { border: 0; border-radius: 14px; max-width: 95vw; } dialog::backdrop { background: #142331b3; } dialog img { display: block; max-width: 85vw; max-height: 70vh; margin: 12px auto; } dialog button { padding: 8px 16px; cursor: pointer; }
+[hidden] { display: none !important; } :focus-visible { outline: 3px solid #24849a; outline-offset: 3px; }
+@media(max-width: 500px) { main { padding: 24px 14px; } .cards { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body><main>
+<header><div class="eyebrow">MEMESENSE / DATA REVIEW</div><h1>表情包模板人工复核</h1>
+<p class="stats">{{TOTAL}} 张样本 · {{GROUPS}} 个候选模板</p>
+<p class="intro">卡片距离为该图与当前参照图的 64 位 pHash 汉明距离，范围 0–64。默认参照为组内最小 sample_id，可切换参照检查误分组。连通分组可能存在传递关系，同组不保证两两相似，距离 0 也不代表原图完全相同。</p>
+<p class="intro">标记针对当前展示的原候选组。可逐张修改 template_id 拆组或合组，留空表示未分组；页面不自动重排，距离仍参照原候选组。修改编号会将该组重置为未复核。确认新编号后，可再次标记分组正确。</p>
+<p class="intro">修改仅保存在当前页面内存，刷新或关闭前请导出 CSV。导出包含全部样本和复核状态，不受筛选影响；原索引和原图不会被回写。缩略图已内嵌，无需联网。</p></header>
+<div class="toolbar">
+<label>搜索 <input id="search" type="search" placeholder="模板、sample_id 或图片路径"></label>
+<label><input id="multi" type="checkbox"> 仅多图组</label>
+<label>复核阈值 <input id="threshold" type="number" min="0" max="64" step="1" value="{{THRESHOLD}}"></label>
+<span id="visible" role="status"></span>
+<button id="export" type="button">导出复核 CSV</button><span id="save-status" role="status">尚无修改</span>
+</div>
+<noscript><p>请启用 JavaScript 以计算距离和筛选；图片和分组仍可直接浏览。</p></noscript>
+{{CONTENT}}
+<p id="no-matches" class="empty" hidden>没有匹配的分组，请调整搜索或筛选条件。</p>
+<dialog id="zoom"><form method="dialog"><button>关闭</button></form><img alt="放大的缩略图"><p></p></dialog>
+</main>
+<script id="review-data" type="application/json">{{DATA}}</script>
+<script id="review-records" type="application/json">{{RECORDS}}</script>
+<script>{{LOGIC}}</script>
+<script>
+const groups = JSON.parse(document.getElementById('review-data').textContent);
+const sourceRecords = JSON.parse(document.getElementById('review-records').textContent);
+const reviewRows = createReviewRows(sourceRecords.rows);
+const reviewById = new Map(reviewRows.map(row => [row.sample_id, row]));
+let dirty = false;
+const sections = [...document.querySelectorAll('.group')];
+const thresholdInput = document.getElementById('threshold');
+function hamming(a, b) {
+  if (!a || !b) return null;
+  let bits = BigInt('0x' + a) ^ BigInt('0x' + b), distance = 0;
+  while (bits) { bits &= bits - 1n; distance++; }
+  return distance;
+}
+function updateDistances(section) {
+  const members = groups[Number(section.dataset.group)];
+  const reference = members[Number(section.querySelector('.reference').value)];
+  const threshold = Number(thresholdInput.value);
+  const validThreshold = thresholdInput.value !== '' && Number.isInteger(threshold) && threshold >= 0 && threshold <= 64;
+  section.querySelectorAll('.card').forEach(card => {
+    const member = members[Number(card.dataset.index)];
+    const distance = hamming(reference.phash, member.phash);
+    const flagged = validThreshold && distance !== null && distance > threshold;
+    card.classList.toggle('flagged', flagged);
+    card.querySelector('.distance').textContent = distance === null
+      ? '距离不可用：本图或参照图 pHash 无效'
+      : `距 ${reference.sample_id}：${distance} / 64${flagged ? ' · 超过复核阈值' : ''}`;
+  });
+}
+function filterGroups() {
+  const query = document.getElementById('search').value.trim().toLowerCase();
+  const multi = document.getElementById('multi').checked;
+  let count = 0;
+  sections.forEach(section => {
+    const searchable = section.textContent + [...section.querySelectorAll('.template-edit')].map(input => input.value).join(' ');
+    const matches = searchable.toLowerCase().includes(query) && (!multi || Number(section.dataset.count) > 1);
+    section.hidden = !matches;
+    if (matches) count++;
+  });
+  document.getElementById('visible').textContent = `显示 ${count} / ${sections.length} 组`;
+  document.getElementById('no-matches').hidden = count > 0 || sections.length === 0;
+}
+sections.forEach(section => {
+  section.querySelector('.reference').addEventListener('change', () => updateDistances(section));
+  updateDistances(section);
+  const members = groups[Number(section.dataset.group)];
+  const ids = members.map(member => member.sample_id);
+  function refreshStatus() {
+    const statuses = new Set(ids.map(id => reviewById.get(id).review_status));
+    section.querySelector('.group-status').textContent = statuses.size === 1
+      ? REVIEW_LABELS[[...statuses][0]] : '部分复核 / 状态不一致';
+    section.querySelectorAll('.card').forEach(card => {
+      const row = reviewById.get(members[Number(card.dataset.index)].sample_id);
+      card.querySelector('.sample-status').textContent = REVIEW_LABELS[row.review_status];
+    });
+  }
+  function changed() {
+    dirty = true;
+    document.getElementById('save-status').textContent = '有未导出的修改';
+    refreshStatus();
+  }
+  section.querySelectorAll('[data-status]').forEach(button => button.addEventListener('click', () => {
+    markReviewGroup(reviewRows, ids, button.dataset.status);
+    changed();
+  }));
+  section.querySelectorAll('.card').forEach(card => {
+    card.querySelector('.template-edit').addEventListener('input', event => {
+      editReviewTemplate(reviewRows, ids, members[Number(card.dataset.index)].sample_id, event.target.value);
+      changed();
+    });
+  });
+  refreshStatus();
+});
+window.addEventListener('beforeunload', event => {
+  if (dirty) { event.preventDefault(); event.returnValue = ''; }
+});
+document.getElementById('export').addEventListener('click', () => {
+  const blob = new Blob([reviewCSV(reviewRows, sourceRecords.fields)], {type: 'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'meme_index_reviewed_' + new Date().toISOString().replace(/[:.]/g, '-') + '.csv';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  dirty = false;
+  document.getElementById('save-status').textContent = '已发起下载，请确认文件已保存';
+});
+thresholdInput.addEventListener('input', () => sections.forEach(updateDistances));
+document.getElementById('search').addEventListener('input', filterGroups);
+document.getElementById('multi').addEventListener('change', filterGroups);
+filterGroups();
+const dialog = document.getElementById('zoom');
+document.querySelectorAll('.preview').forEach(button => button.addEventListener('click', () => {
+  const image = button.querySelector('img');
+  dialog.querySelector('img').src = image.src;
+  dialog.querySelector('p').textContent = image.alt + ' · 缩略图预览';
+  dialog.showModal();
+}));
+</script></body></html>
